@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>森浦 Lucky Draw</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,800;1,900&family=Cormorant+Garamond:ital,wght@1,400&family=Inter:wght@300;400;500;600&family=ZCOOL+KuaiLe&family=Ma+Shan+Zheng&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{background:#06050A;font-family:'Inter',sans-serif;color:#EDE7D8;overflow:hidden;}
+.page{height:100vh;display:flex;flex-direction:column;position:relative;overflow:hidden;}
+#bgC{position:absolute;inset:0;width:100%;height:100%;z-index:0;}
+
+/* top bar */
+.topbar{display:grid;grid-template-columns:1fr;align-items:center;height:62px;padding:0 34px;border-bottom:1px solid rgba(255,255,255,.05);position:relative;z-index:10;}
+.logo{display:flex;flex-direction:column;gap:3px;}
+.logo-main{font-size:12px;font-weight:700;color:#C7A23A;letter-spacing:.08em;}
+.logo-sub{font-size:8px;letter-spacing:.26em;color:#6A551F;text-transform:uppercase;}
+/* 抽奖结果按钮 - 固定在右上角，lucky draw 标题中线高度 */
+.nav-item{position:fixed;top:100px;right:60px;z-index:50;display:flex;align-items:center;padding:10px 24px;font-size:13px;color:rgba(255,255,255,.5);letter-spacing:.06em;cursor:pointer;border-radius:99px;transition:all .3s;border:1.5px solid rgba(210,168,60,.4);background:rgba(210,168,60,.08);box-shadow:0 4px 16px rgba(210,168,60,.25);}
+.nav-item:hover{color:#FCE7A8;border-color:rgba(210,168,60,.7);background:rgba(210,168,60,.15);box-shadow:0 6px 24px rgba(210,168,60,.4);transform:translateY(-2px);}
+.nav-item.on{color:#FCE7A8;border-color:rgba(210,168,60,.6);background:rgba(210,168,60,.12);}
+
+/* hero title */
+.hero{display:flex;justify-content:center;align-items:center;padding:26px 20px 6px;position:relative;z-index:5;}
+#titleC{display:block;max-width:100%;}
+
+/* stage */
+.stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;position:relative;z-index:5;padding:4px 20px;}
+.btn-setup{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg,#F0D461,#B5821A);color:#1A1303;font-weight:700;font-size:13px;letter-spacing:.04em;border:none;border-radius:99px;padding:10px 26px;cursor:pointer;box-shadow:0 6px 22px rgba(210,168,60,.28);transition:transform .15s,box-shadow .2s;font-family:'Inter',sans-serif;}
+.btn-setup:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(210,168,60,.42);}
+.btn-setup:active{transform:translateY(0);}
+.dial-wrap{position:relative;}
+#dialC{display:block;cursor:pointer;position:relative;z-index:2;}
+.dial-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;width:260px;}
+.dc-label{font-size:11px;letter-spacing:.08em;color:rgba(255,215,120,.6);font-weight:300;}
+.dc-name{font-family:'Ma Shan Zheng',serif;font-size:30px;line-height:1.25;color:#FCEFC0;text-shadow:0 0 18px rgba(240,200,90,.55);margin-top:4px;min-height:36px;}
+.dc-prize{font-family:'ZCOOL KuaiLe',cursive;font-size:13px;color:#E8C84A;letter-spacing:.05em;margin-top:2px;}
+
+/* bottom info bar (art font) */
+.infobar{position:relative;z-index:5;min-height:96px;padding:14px 34px 26px;display:flex;flex-direction:column;align-items:center;gap:10px;}
+.info-empty{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;color:rgba(220,200,150,.4);letter-spacing:.04em;}
+.info-head{font-family:'Ma Shan Zheng',serif;font-size:22px;color:#F2E2A6;letter-spacing:.06em;text-shadow:0 0 16px rgba(210,168,60,.35);display:flex;align-items:baseline;gap:10px;}
+.info-head .num{font-family:'Playfair Display',serif;font-style:italic;font-weight:900;font-size:30px;background:linear-gradient(175deg,#FFF5B0,#E8C84A 45%,#B5821A);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;padding:0 4px;}
+.prize-chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;max-width:880px;}
+.prize-chip{font-family:'ZCOOL KuaiLe',cursive;font-size:14px;padding:6px 16px;border-radius:99px;background:rgba(210,168,60,.08);border:1px solid rgba(210,168,60,.28);color:#EBD27E;letter-spacing:.04em;display:flex;align-items:center;gap:7px;transition:all .2s;}
+.prize-chip.done{opacity:.45;text-decoration:line-through;}
+.prize-chip .pc-n{font-family:'Playfair Display',serif;font-style:italic;font-weight:800;color:#FCEFC0;}
+
+/* modal */
+.mask{position:fixed;inset:0;background:rgba(4,3,8,.72);backdrop-filter:blur(6px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
+.mask.show{display:flex;}
+.modal{width:min(680px,94vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column;background:linear-gradient(160deg,#15121E,#0C0A14);border:1px solid rgba(210,168,60,.25);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.04);}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.06);}
+.modal-title{font-family:'Playfair Display',serif;font-style:italic;font-weight:800;font-size:22px;background:linear-gradient(175deg,#FFF5B0,#E8C84A 50%,#B5821A);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.modal-close{background:none;border:none;color:rgba(255,255,255,.4);font-size:22px;cursor:pointer;line-height:1;padding:4px 8px;border-radius:8px;transition:all .2s;}
+.modal-close:hover{color:#fff;background:rgba(255,255,255,.08);}
+.modal-body{padding:20px 24px;overflow-y:auto;flex:1;}
+.field-label{font-size:12px;color:rgba(255,255,255,.5);letter-spacing:.05em;margin-bottom:8px;}
+.drop{border:1.5px dashed rgba(210,168,60,.35);border-radius:14px;padding:22px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(210,168,60,.03);}
+.drop:hover{border-color:rgba(210,168,60,.6);background:rgba(210,168,60,.07);}
+.drop .di{font-size:30px;}
+.drop .dt{font-size:13px;color:#D9C078;margin-top:6px;}
+.drop .ds{font-size:11px;color:rgba(255,255,255,.35);margin-top:3px;}
+.list-status{margin-top:12px;font-size:13px;color:#7FBF9A;display:flex;align-items:center;gap:8px;min-height:20px;}
+.list-status.warn{color:#D98A6A;}
+
+/* prizes */
+.prize-row{display:grid;grid-template-columns:140px 110px auto;gap:10px;align-items:center;margin-bottom:10px;}
+.prize-row select,.prize-row .prize-input,.prize-row input{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:9px;color:#EDE7D8;padding:9px 11px;font-size:13px;font-family:inherit;}
+.prize-row select{-webkit-appearance:none;-moz-appearance:none;appearance:none;padding-right:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23D2A83C' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px;}
+.prize-row select:focus,.prize-row .prize-input:focus,.prize-row input:focus{outline:none;border-color:rgba(210,168,60,.5);}
+/* custom spinner — vertical buttons on right side */
+.spinner-wrap{display:flex;align-items:center;background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:9px;overflow:hidden;height:38px;}
+.spinner-wrap input[type=number]{-webkit-appearance:none;-moz-appearance:textfield;appearance:textfield;background:transparent;border:none;color:#EDE7D8;font-size:13px;font-family:inherit;text-align:center;padding:0 8px;flex:1;min-width:0;}
+.spinner-wrap input[type=number]::-webkit-inner-spin-button,.spinner-wrap input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.spinner-wrap input[type=number]:focus{outline:none;}
+.spinner-btns{display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.1);flex-shrink:0;}
+.spinner-btn{background:none;border:none;color:rgba(210,168,60,.7);cursor:pointer;width:24px;height:19px;display:flex;align-items:center;justify-content:center;font-size:9px;transition:all .2s;padding:0;line-height:1;}
+.spinner-btn:first-child{border-bottom:1px solid rgba(255,255,255,.1);}
+.spinner-btn:hover{background:rgba(210,168,60,.18);color:#FCE7A8;}
+.spinner-btn:active{background:rgba(210,168,60,.28);}
+.spinner-wrap:focus-within{border-color:rgba(210,168,60,.5);}
+/* delete button */
+.prize-row .del{background:rgba(217,138,106,.1);border:1px solid rgba(217,138,106,.25);color:#D98A6A;border-radius:9px;width:36px;height:36px;cursor:pointer;font-size:14px;line-height:1;transition:all .25s;display:flex;align-items:center;justify-content:center;padding:0;}
+.prize-row .del:hover{background:rgba(217,138,106,.35);border-color:rgba(217,138,106,.6);color:#F4A07A;transform:scale(1.08);}
+.prize-row .del:active{transform:scale(0.96);}
+.btn-add{margin-top:6px;background:rgba(210,168,60,.1);border:1px dashed rgba(210,168,60,.4);color:#E8C84A;border-radius:10px;padding:10px;width:160px;cursor:pointer;font-size:13px;transition:all .2s;}
+.btn-add:hover{background:rgba(210,168,60,.18);}
+
+.modal-foot{padding:16px 24px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:flex-end;gap:10px;}
+.btn-ghost{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:99px;padding:9px 20px;cursor:pointer;font-size:13px;transition:all .2s;}
+.btn-ghost:hover{border-color:rgba(255,255,255,.35);color:#fff;}
+.btn-confirm{background:linear-gradient(135deg,#F0D461,#B5821A);color:#1A1303;font-weight:700;border:none;border-radius:99px;padding:9px 26px;cursor:pointer;font-size:13px;box-shadow:0 6px 20px rgba(210,168,60,.3);transition:transform .15s;}
+.btn-confirm:hover{transform:translateY(-2px);}
+
+/* results */
+.result-group{margin-bottom:18px;}
+.rg-head{font-family:'ZCOOL KuaiLe',cursive;font-size:17px;color:#F2D873;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.rg-head .bar{flex:1;height:1px;background:linear-gradient(90deg,rgba(210,168,60,.4),transparent);}
+.winner-list{display:flex;flex-direction:column;gap:6px;}
+.winner{background:rgba(210,168,60,.06);border:1px solid rgba(210,168,60,.2);border-radius:10px;padding:9px 12px;display:flex;gap:12px;align-items:center;}
+.winner .wn{font-family:'Ma Shan Zheng',serif;font-size:16px;color:#FCEFC0;min-width:80px;}
+.winner .wq{font-size:11px;color:rgba(255,200,100,.65);font-family:'Inter',monospace;min-width:140px;}
+.winner .wo{font-size:11px;color:rgba(255,255,255,.5);flex:1;}
+.result-empty{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:16px;color:rgba(220,200,150,.4);text-align:center;padding:30px;}
+.result-foot-btns{display:flex;gap:10px;}
+
+/* toast */
+.toast{position:fixed;left:50%;top:84px;transform:translateX(-50%) translateY(-16px);background:linear-gradient(135deg,rgba(40,30,12,.96),rgba(26,19,7,.96));border:1px solid rgba(210,168,60,.5);color:#FCE7A8;padding:12px 24px;border-radius:99px;font-size:13px;letter-spacing:.04em;z-index:200;opacity:0;pointer-events:none;transition:all .3s;box-shadow:0 10px 30px rgba(0,0,0,.4);}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="page">
+  <canvas id="bgC"></canvas>
+
+  <div class="topbar">
+    <div class="logo">
+      <span class="logo-main">森浦 Sumscope</span>
+      <span class="logo-sub">Lucky Draw System</span>
+    </div>
+  </div>
+
+  <!-- 抽奖结果按钮 - 独立悬浮在右上角 -->
+  <div class="nav-item on" data-nav="result">抽奖结果</div>
+
+  <div class="hero">
+    <canvas id="titleC" width="620" height="130"></canvas>
+  </div>
+
+  <div class="stage">
+    <button class="btn-setup" id="btnSetup">✦ 抽奖设置</button>
+    <div class="dial-wrap">
+      <canvas id="dialC" width="520" height="380"></canvas>
+      <div class="dial-center">
+        <div class="dc-label" id="dcLabel">点击抽奖</div>
+        <div class="dc-name" id="dcName"></div>
+        <div class="dc-prize" id="dcPrize"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="infobar" id="infobar">
+    <div class="info-empty">尚未配置 · 点击「抽奖设置」按钮开始</div>
+  </div>
+</div>
+
+<!-- ===== Setup Modal ===== -->
+<div class="mask" id="setupMask">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">抽奖设置</div>
+      <button class="modal-close" data-close>×</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-label">上传 Excel 名单（.xlsx / .xls）</div>
+      <div class="drop" id="drop">
+        <div class="di">📋</div>
+        <div class="dt">点击或拖拽 Excel 文件到此处</div>
+        <div class="ds">自动识别「姓名」「QB账号」「机构」「客户经理」列</div>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+      <div class="list-status" id="listStatus"></div>
+
+      <div style="height:24px;"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 200px;gap:24px;">
+        <div>
+          <div class="field-label">设置奖项</div>
+          <div id="prizeRows"></div>
+          <button class="btn-add" id="btnAddPrize">＋ 新增奖项</button>
+        </div>
+
+        <div>
+          <div class="field-label">获奖名单显示设置</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.7);">
+              <input type="checkbox" id="showName" checked style="cursor:pointer;accent-color:#D2A83C;">
+              <span>姓名</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.7);">
+              <input type="checkbox" id="showQB" checked style="cursor:pointer;accent-color:#D2A83C;">
+              <span>QB账号</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.7);">
+              <input type="checkbox" id="showOrg" checked style="cursor:pointer;accent-color:#D2A83C;">
+              <span>机构名称</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:rgba(255,255,255,.7);">
+              <input type="checkbox" id="showManager" checked style="cursor:pointer;accent-color:#D2A83C;">
+              <span>客户经理</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-ghost" data-close>取消</button>
+      <button class="btn-confirm" id="btnConfirm">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Result Modal ===== -->
+<div class="mask" id="resultMask">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">抽奖结果</div>
+      <button class="modal-close" data-close>×</button>
+    </div>
+    <div class="modal-body" id="resultBody">
+      <div class="result-empty">还没有抽奖结果，快去转动星盘吧 ✦</div>
+    </div>
+    <div class="modal-foot">
+      <div class="result-foot-btns">
+        <button class="btn-ghost" id="btnExport">导出结果 (CSV)</button>
+        <button class="btn-ghost" id="btnReset">重置抽奖</button>
+      </div>
+      <button class="btn-confirm" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ====================== STATE ====================== */
+const State = {
+  participants: [],   // [{name, qb, org, manager}]
+  prizes: [],         // [{label, count}]
+  winners: {},        // { prizeIndex: [ {name, qb, org, manager} ] }
+  configured: false,
+  displayFields: {name: true, qb: true, org: true, manager: true}  // what to show in results
+};
+
+/* ====================== TOAST ====================== */
+const toastEl = document.getElementById('toast');
+let toastTimer;
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toastEl.classList.remove('show'), 2200);
+}
+
+/* ====================== CANVAS REFS ====================== */
+const bgC=document.getElementById('bgC'), bgX=bgC.getContext('2d');
+const titC=document.getElementById('titleC'), titX=titC.getContext('2d');
+const dialC=document.getElementById('dialC'), dialX=dialC.getContext('2d');
+
+function resizeBg(){ const p=bgC.parentElement; bgC.width=p.offsetWidth; bgC.height=p.offsetHeight; }
+resizeBg(); window.addEventListener('resize', resizeBg);
+
+/* ====================== BACKGROUND STARFIELD ====================== */
+const BG_STARS=Array.from({length:180},()=>({
+  x:Math.random(),y:Math.random(),r:Math.random()*1.4+.2,
+  a:Math.random()*.55+.08,twinkle:Math.random()*Math.PI*2,
+  speed:Math.random()*.025+.006,cross:Math.random()>.6
+}));
+const NEBULAS=[
+  {x:.16,y:.22,rx:200,ry:130,a:.05,color:'90,66,190'},
+  {x:.84,y:.72,rx:180,ry:120,a:.045,color:'190,135,32'},
+  {x:.5,y:.5,rx:260,ry:170,a:.032,color:'110,76,170'},
+];
+function drawBg(){
+  const W=bgC.width,H=bgC.height;
+  bgX.clearRect(0,0,W,H);
+  const grad=bgX.createRadialGradient(W*.5,H*.4,0,W*.5,H*.5,Math.max(W,H)*.75);
+  grad.addColorStop(0,'#120E1E');grad.addColorStop(.5,'#0A0810');grad.addColorStop(1,'#06050A');
+  bgX.fillStyle=grad;bgX.fillRect(0,0,W,H);
+  NEBULAS.forEach(n=>{
+    const g=bgX.createRadialGradient(n.x*W,n.y*H,0,n.x*W,n.y*H,Math.max(n.rx,n.ry));
+    g.addColorStop(0,`rgba(${n.color},${n.a})`);g.addColorStop(1,`rgba(${n.color},0)`);
+    bgX.save();bgX.translate(n.x*W,n.y*H);bgX.scale(n.rx/Math.max(n.rx,n.ry),n.ry/Math.max(n.rx,n.ry));
+    bgX.translate(-n.x*W,-n.y*H);bgX.fillStyle=g;
+    bgX.beginPath();bgX.ellipse(n.x*W,n.y*H,Math.max(n.rx,n.ry),Math.max(n.rx,n.ry),0,0,Math.PI*2);
+    bgX.fill();bgX.restore();
+  });
+  BG_STARS.forEach(s=>{
+    s.twinkle+=s.speed;
+    const a=s.a*(0.4+Math.sin(s.twinkle)*.6),sx=s.x*W,sy=s.y*H;
+    bgX.save();bgX.translate(sx,sy);
+    if(s.cross){
+      const sg=bgX.createRadialGradient(0,0,0,0,0,s.r*5);
+      sg.addColorStop(0,`rgba(255,235,160,${a*.6})`);sg.addColorStop(1,'rgba(255,235,160,0)');
+      bgX.beginPath();bgX.arc(0,0,s.r*5,0,Math.PI*2);bgX.fillStyle=sg;bgX.fill();
+      bgX.strokeStyle=`rgba(255,235,160,${a*.45})`;bgX.lineWidth=.5;
+      bgX.beginPath();bgX.moveTo(-s.r*4,0);bgX.lineTo(s.r*4,0);bgX.stroke();
+      bgX.beginPath();bgX.moveTo(0,-s.r*4);bgX.lineTo(0,s.r*4);bgX.stroke();
+    }
+    bgX.beginPath();bgX.arc(0,0,s.r,0,Math.PI*2);bgX.fillStyle=`rgba(240,228,180,${a})`;bgX.fill();
+    bgX.restore();
+  });
+}
+/* ====================== TITLE (enlarged) ====================== */
+const TW=620,TH=130,TCX=310,TCY=66;
+function drawTitle(t){
+  titX.clearRect(0,0,TW,TH);
+  titX.save();
+  titX.font="italic 900 72px 'Playfair Display', Georgia, serif";
+  titX.textAlign='center';titX.textBaseline='middle';
+  titX.shadowColor='rgba(210,168,60,.55)';titX.shadowBlur=34;
+  const grad=titX.createLinearGradient(TCX-200,0,TCX+200,0);
+  grad.addColorStop(0,'#FFF7C2');grad.addColorStop(.35,'#E8C84A');
+  grad.addColorStop(.65,'#B5821A');grad.addColorStop(1,'#E8C84A');
+  titX.fillStyle=grad;
+  titX.fillText('lucky draw',TCX,TCY);
+  titX.shadowBlur=0;
+  const sparkles=[
+    {x:70,y:34},{x:560,y:34},{x:42,y:92},{x:582,y:90},
+    {x:160,y:16},{x:470,y:16},{x:200,y:116},{x:430,y:116},
+    {x:300,y:10},{x:308,y:122}
+  ];
+  sparkles.forEach((sp,i)=>{
+    const pulse=Math.sin(t*1.5+i*.8)*.5+.5,a=pulse*.75+.15,r=1.1+pulse*1.2;
+    titX.save();titX.translate(sp.x,sp.y);
+    titX.beginPath();titX.arc(0,0,r,0,Math.PI*2);
+    titX.fillStyle=`rgba(255,238,160,${a})`;titX.fill();
+    if(pulse>.6){
+      titX.strokeStyle=`rgba(255,238,160,${(pulse-.6)*1.6})`;titX.lineWidth=.7;
+      titX.beginPath();titX.moveTo(-r*3.5,0);titX.lineTo(r*3.5,0);titX.stroke();
+      titX.beginPath();titX.moveTo(0,-r*3.5);titX.lineTo(0,r*3.5);titX.stroke();
+    }
+    titX.restore();
+  });
+  titX.restore();
+}
+
+/* ====================== DIAL ====================== */
+const DW=520,DH=380,DMX=260,DMY=190;
+const layers=[
+  {r:165,speed:.0007,dir:1},{r:146,speed:.0011,dir:-1},
+  {r:127,speed:.0005,dir:1},{r:108,speed:.0013,dir:-1},
+  {r:89,speed:.0008,dir:1},{r:70,speed:.0012,dir:-1},
+  {r:51,speed:.0006,dir:1},
+];
+let layerAngles=layers.map(()=>Math.random()*Math.PI*2);
+let hov=false, clickBursts=[], shootingStars=[];
+let spinSpeed=0;
+
+function drawDialLayer(r,angle,idx,boost){
+  dialX.save();
+  dialX.translate(DMX,DMY);dialX.rotate(angle);dialX.translate(-DMX,-DMY);
+  const b=(hov?.65:.42)+boost*.3;
+  if(idx===0){
+    for(let i=0;i<72;i++){
+      const a=(i/72)*Math.PI*2-Math.PI/2,maj=i%9===0;
+      dialX.beginPath();
+      dialX.moveTo(DMX+r*Math.cos(a),DMY+r*Math.sin(a));
+      dialX.lineTo(DMX+(r-(maj?12:5))*Math.cos(a),DMY+(r-(maj?12:5))*Math.sin(a));
+      dialX.strokeStyle=`rgba(210,168,60,${maj?b+.15:b*.5})`;
+      dialX.lineWidth=maj?1.5:.7;dialX.stroke();
+    }
+  } else if(idx===1){
+    for(let i=0;i<10;i++){
+      const sa=(i/10)*Math.PI*2-Math.PI/2;
+      dialX.beginPath();dialX.arc(DMX,DMY,r,sa,sa+.38);
+      dialX.strokeStyle=`rgba(190,145,30,${b*.55})`;dialX.lineWidth=3.2;dialX.stroke();
+    }
+  } else if(idx===2){
+    dialX.beginPath();dialX.arc(DMX,DMY,r,0,Math.PI*2);
+    dialX.setLineDash([4,10]);dialX.strokeStyle=`rgba(160,118,26,${b*.55})`;dialX.lineWidth=1.1;dialX.stroke();
+    dialX.setLineDash([]);
+    for(let i=0;i<8;i++){
+      const a=(i/8)*Math.PI*2-Math.PI/2;
+      dialX.save();dialX.translate(DMX+r*Math.cos(a),DMY+r*Math.sin(a));dialX.rotate(Math.PI/4);
+      dialX.fillStyle=`rgba(180,132,30,${b*.6})`;dialX.fillRect(-4,-4,8,8);dialX.restore();
+    }
+  } else if(idx===3){
+    dialX.beginPath();dialX.arc(DMX,DMY,r,0,Math.PI*2);
+    dialX.setLineDash([5,13]);dialX.strokeStyle=`rgba(210,168,60,${b*.75})`;dialX.lineWidth=1.3;dialX.stroke();
+    dialX.setLineDash([]);
+    for(let i=0;i<4;i++){
+      const a=(i/4)*Math.PI*2-Math.PI/2,dx=DMX+r*Math.cos(a),dy=DMY+r*Math.sin(a);
+      const dg=dialX.createRadialGradient(dx,dy,0,dx,dy,10);
+      dg.addColorStop(0,`rgba(255,240,150,${b*.9})`);dg.addColorStop(1,'rgba(210,168,60,0)');
+      dialX.beginPath();dialX.arc(dx,dy,10,0,Math.PI*2);dialX.fillStyle=dg;dialX.fill();
+      dialX.beginPath();dialX.arc(dx,dy,3.4,0,Math.PI*2);dialX.fillStyle=`rgba(255,240,160,${b})`;dialX.fill();
+    }
+  } else if(idx===4){
+    for(let i=0;i<48;i++){
+      const a=(i/48)*Math.PI*2-Math.PI/2,maj=i%6===0;
+      dialX.beginPath();
+      dialX.moveTo(DMX+r*Math.cos(a),DMY+r*Math.sin(a));
+      dialX.lineTo(DMX+(r-(maj?8:3.5))*Math.cos(a),DMY+(r-(maj?8:3.5))*Math.sin(a));
+      dialX.strokeStyle=`rgba(180,132,28,${maj?b*.65:b*.3})`;dialX.lineWidth=maj?1.2:.6;dialX.stroke();
+    }
+  } else if(idx===5){
+    dialX.beginPath();dialX.arc(DMX,DMY,r,0,Math.PI*2);
+    dialX.strokeStyle=`rgba(210,168,60,${b*.6})`;dialX.lineWidth=1.1;dialX.stroke();
+    for(let i=0;i<4;i++){
+      const a=(i/4)*Math.PI*2-Math.PI/2,dx=DMX+r*Math.cos(a),dy=DMY+r*Math.sin(a);
+      const dg=dialX.createRadialGradient(dx,dy,0,dx,dy,9);
+      dg.addColorStop(0,`rgba(255,232,120,${b})`);dg.addColorStop(1,'rgba(210,168,60,0)');
+      dialX.beginPath();dialX.arc(dx,dy,9,0,Math.PI*2);dialX.fillStyle=dg;dialX.fill();
+      dialX.beginPath();dialX.arc(dx,dy,2.8,0,Math.PI*2);dialX.fillStyle=`rgba(255,245,170,${b+.1})`;dialX.fill();
+    }
+  } else {
+    dialX.beginPath();dialX.arc(DMX,DMY,r,0,Math.PI*2);
+    dialX.strokeStyle=`rgba(110,80,18,${b*.45})`;dialX.lineWidth=1.1;dialX.stroke();
+  }
+  dialX.restore();
+}
+
+function drawDial(t){
+  dialX.clearRect(0,0,DW,DH);
+  const pulse=Math.sin(t)*.5+.5;
+
+  // ambient glow behind dial
+  const ag=dialX.createRadialGradient(DMX,DMY,15,DMX,DMY,180);
+  ag.addColorStop(0,`rgba(120,90,15,${.08+pulse*.05})`);
+  ag.addColorStop(.6,`rgba(60,40,8,.045)`);
+  ag.addColorStop(1,'rgba(0,0,0,0)');
+  dialX.fillStyle=ag;dialX.fillRect(0,0,DW,DH);
+
+  // side arcs
+  [[70,DMY,90,-.9,.9],[20,DMY,130,-.65,.65],[DW-70,DMY,90,Math.PI-.9,Math.PI+.9],[DW-20,DMY,130,Math.PI-.65,Math.PI+.65]].forEach(([ax,ay,r,sa,ea],i)=>{
+    const off=Math.sin(t*.4+i)*.08;
+    dialX.beginPath();dialX.arc(ax,ay,r,sa+off,ea+off);
+    dialX.strokeStyle=`rgba(180,130,24,${.2+pulse*.1})`;dialX.lineWidth=1.2;
+    dialX.setLineDash([6,11]);dialX.stroke();dialX.setLineDash([]);
+  });
+
+  // rotate layers
+  const boost=spinSpeed>0?Math.min(spinSpeed/8,.5):0;
+  layers.forEach((l,i)=>{
+    layerAngles[i]+=(l.speed*l.dir)+(spinSpeed*l.dir*.15);
+    drawDialLayer(l.r,layerAngles[i],i,boost);
+  });
+  if(spinSpeed>0) spinSpeed*=.96;
+  if(spinSpeed<.01) spinSpeed=0;
+
+  // center star
+  const cg=dialX.createRadialGradient(DMX,DMY,0,DMX,DMY,26);
+  cg.addColorStop(0,`rgba(255,245,155,${.6+pulse*.4})`);
+  cg.addColorStop(.35,`rgba(210,168,60,${.18+pulse*.12})`);
+  cg.addColorStop(1,'rgba(0,0,0,0)');
+  dialX.beginPath();dialX.arc(DMX,DMY,26,0,Math.PI*2);dialX.fillStyle=cg;dialX.fill();
+
+  // 8-spike star
+  [0,45,90,135,180,225,270,315].forEach(deg=>{
+    const a=deg*Math.PI/180+(t*.18);
+    const len=deg%90===0?20:11;
+    dialX.save();dialX.translate(DMX,DMY);dialX.rotate(a);
+    dialX.strokeStyle=`rgba(255,242,155,${deg%90===0?.5+pulse*.3:.22+pulse*.18})`;
+    dialX.lineWidth=deg%90===0?1.1:.6;
+    dialX.beginPath();dialX.moveTo(0,0);dialX.lineTo(0,-len);dialX.stroke();
+    dialX.restore();
+  });
+  dialX.beginPath();dialX.arc(DMX,DMY,2.8,0,Math.PI*2);
+  dialX.fillStyle=`rgba(255,252,200,.95)`;dialX.fill();
+
+  // click bursts
+  clickBursts=clickBursts.filter(b=>{
+    b.r+=b.speed;b.a-=.028;if(b.a<=0)return false;
+    dialX.beginPath();dialX.arc(DMX,DMY,b.r,0,Math.PI*2);
+    dialX.strokeStyle=`rgba(210,168,60,${b.a})`;dialX.lineWidth=1.4;dialX.stroke();
+    return true;
+  });
+
+  // shooting stars
+  shootingStars=shootingStars.filter(s=>{
+    s.x+=s.vx;s.y+=s.vy;s.a-=.04;if(s.a<=0)return false;
+    dialX.beginPath();dialX.moveTo(s.x,s.y);dialX.lineTo(s.x-s.vx*s.len*.5,s.y-s.vy*s.len*.5);
+    const sg=dialX.createLinearGradient(s.x,s.y,s.x-s.vx*5,s.y-s.vy*5);
+    sg.addColorStop(0,`rgba(255,242,155,${s.a})`);sg.addColorStop(1,'rgba(255,242,155,0)');
+    dialX.strokeStyle=sg;dialX.lineWidth=1.6;dialX.stroke();
+    dialX.beginPath();dialX.arc(s.x,s.y,1.8,0,Math.PI*2);
+    dialX.fillStyle=`rgba(255,252,200,${s.a})`;dialX.fill();
+    return true;
+  });
+
+  // hover glow
+  if(hov){
+    const hg=dialX.createRadialGradient(DMX,DMY,155,DMX,DMY,175);
+    hg.addColorStop(0,'rgba(210,168,60,0)');
+    hg.addColorStop(.5,`rgba(210,168,60,${.08+pulse*.06})`);
+    hg.addColorStop(1,'rgba(210,168,60,0)');
+    dialX.beginPath();dialX.arc(DMX,DMY,175,0,Math.PI*2);dialX.fillStyle=hg;dialX.fill();
+  }
+}
+
+/* ====================== ANIMATION LOOP ====================== */
+let T=0;
+function loop(){
+  T+=.016;
+  drawBg(T);
+  drawTitle(T);
+  drawDial(T);
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* ====================== DIAL INTERACTION ====================== */
+dialC.addEventListener('mouseenter',()=>hov=true);
+dialC.addEventListener('mouseleave',()=>hov=false);
+dialC.addEventListener('click',()=>{
+  if(!State.configured){
+    toast('请先完成抽奖设置');
+    document.getElementById('btnSetup').click();
+    return;
+  }
+  const pool=State.participants.filter(p=>!Object.values(State.winners).flat().find(w=>w.name===p.name));
+  if(pool.length===0){
+    toast('所有人都已中奖');
+    return;
+  }
+  const nextPrizeIdx=State.prizes.findIndex((pr,i)=>(State.winners[i]||[]).length<pr.count);
+  if(nextPrizeIdx===-1){
+    toast('所有奖项已抽完');
+    return;
+  }
+  startDraw(nextPrizeIdx);
+});
+
+function startDraw(prizeIdx){
+  const prize=State.prizes[prizeIdx];
+  const pool=State.participants.filter(p=>!Object.values(State.winners).flat().find(w=>w.name===p.name));
+  const needed=prize.count-(State.winners[prizeIdx]||[]).length;
+  const drawCount=Math.min(needed,pool.length);
+
+  // trigger effects
+  for(let i=0;i<6;i++) clickBursts.push({r:0,a:.85,speed:2+i*1.3});
+  for(let i=0;i<28;i++){
+    const a=(i/28)*Math.PI*2;
+    shootingStars.push({
+      x:DMX,y:DMY,
+      vx:Math.cos(a)*(2+Math.random()*4.5),
+      vy:Math.sin(a)*(2+Math.random()*4.5),
+      a:1.0,len:14+Math.random()*24
+    });
+  }
+  spinSpeed=8;
+
+  // rolling animation
+  const dcLabel=document.getElementById('dcLabel');
+  const dcName=document.getElementById('dcName');
+  const dcPrize=document.getElementById('dcPrize');
+  dcLabel.textContent='正在抽奖';
+  dcPrize.textContent=prize.label;
+
+  let elapsed=0, interval=50;
+  const duration=1200;
+  const roll=()=>{
+    elapsed+=interval;
+    const progress=elapsed/duration;
+    if(progress<1){
+      const candidate=pool[Math.floor(Math.random()*pool.length)];
+      dcName.textContent=candidate.name;
+      interval=50+progress*120;
+      setTimeout(roll,interval);
+    } else {
+      // pick winners
+      const shuffled=[...pool].sort(()=>Math.random()-.5);
+      const winners=shuffled.slice(0,drawCount);
+
+      if(!State.winners[prizeIdx]) State.winners[prizeIdx]=[];
+      State.winners[prizeIdx].push(...winners);
+
+      dcLabel.textContent='获奖者';
+      dcName.textContent=`${winners.length}人`;
+
+      renderInfobar();
+      toast(`🎉 ${prize.label} 已抽取 ${drawCount} 人`);
+
+      // check if all done
+      const allDone=State.prizes.every((pr,i)=>(State.winners[i]||[]).length>=pr.count);
+      if(allDone){
+        setTimeout(()=>{
+          toast('✦ 所有奖项已抽完');
+          setTimeout(()=>{
+            renderResults();
+            resultMask.classList.add('show');
+            document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('on'));
+            document.querySelector('[data-nav="result"]').classList.add('on');
+          },1500);
+        },1200);
+      }
+    }
+  };
+  roll();
+}
+
+/* ====================== INFOBAR ====================== */
+function renderInfobar(){
+  const ib=document.getElementById('infobar');
+  if(!State.configured){
+    ib.innerHTML='<div class="info-empty">尚未配置 · 点击「抽奖设置」按钮开始</div>';
+    return;
+  }
+  const total=State.prizes.reduce((s,p)=>s+p.count,0);
+  const drawn=Object.values(State.winners).flat().length;
+  const chips=State.prizes.map((pr,i)=>{
+    const w=State.winners[i]||[];
+    const done=w.length>=pr.count;
+    return `<div class="prize-chip ${done?'done':''}"><span class="pc-n">${w.length}</span>/${pr.count} ${pr.label}</div>`;
+  }).join('');
+  ib.innerHTML=`
+    <div class="info-head">已抽取 <span class="num">${drawn}</span> / ${total}</div>
+    <div class="prize-chips">${chips}</div>
+  `;
+}
+
+/* ====================== SETUP MODAL ====================== */
+const setupMask=document.getElementById('setupMask');
+const resultMask=document.getElementById('resultMask');
+
+document.getElementById('btnSetup').addEventListener('click',()=>{
+  setupMask.classList.add('show');
+  if(State.prizes.length===0){
+    State.prizes=[{label:'一等奖',count:1},{label:'二等奖',count:2},{label:'三等奖',count:3}];
+  }
+  renderPrizeRows();
+});
+
+document.querySelectorAll('[data-close]').forEach(el=>el.addEventListener('click',()=>{
+  setupMask.classList.remove('show');
+  resultMask.classList.remove('show');
+}));
+
+document.querySelectorAll('[data-nav]').forEach(el=>el.addEventListener('click',()=>{
+  const nav=el.dataset.nav;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('on'));
+  el.classList.add('on');
+  if(nav==='result'){
+    renderResults();
+    resultMask.classList.add('show');
+  }
+}));
+
+/* ====================== FILE UPLOAD ====================== */
+const drop=document.getElementById('drop');
+const fileInput=document.getElementById('fileInput');
+const pasteArea=document.getElementById('pasteArea');
+const listStatus=document.getElementById('listStatus');
+
+drop.addEventListener('click',()=>fileInput.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.style.borderColor='rgba(210,168,60,.8)';});
+drop.addEventListener('dragleave',()=>drop.style.borderColor='');
+drop.addEventListener('drop',e=>{
+  e.preventDefault();drop.style.borderColor='';
+  const file=e.dataTransfer.files[0];
+  if(file) parseExcel(file);
+});
+fileInput.addEventListener('change',e=>{
+  const file=e.target.files[0];
+  if(file) parseExcel(file);
+});
+
+function parseExcel(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      if(rows.length<2){listStatus.innerHTML='<span class="warn">⚠ 文件为空</span>';return;}
+      const header=rows[0].map(h=>(h||'').toString().trim());
+      const nameCol=header.findIndex(h=>/姓名|名字|name/i.test(h));
+      const qbCol=header.findIndex(h=>/qb|账号|account|email/i.test(h));
+      const orgCol=header.findIndex(h=>/机构|公司|组织|org/i.test(h));
+      const managerCol=header.findIndex(h=>/客户经理|经理|manager/i.test(h));
+      if(nameCol===-1){listStatus.innerHTML='<span class="warn">⚠ 未找到「姓名」列</span>';return;}
+      State.participants=rows.slice(1).map(r=>({
+        name:(r[nameCol]||'').toString().trim(),
+        qb:qbCol!==-1?(r[qbCol]||'').toString().trim():'',
+        org:orgCol!==-1?(r[orgCol]||'').toString().trim():'',
+        manager:managerCol!==-1?(r[managerCol]||'').toString().trim():''
+      })).filter(p=>p.name);
+      listStatus.innerHTML=`✓ 已导入 ${State.participants.length} 人`;
+      listStatus.classList.remove('warn');
+    }catch(err){
+      listStatus.innerHTML='<span class="warn">⚠ 解析失败：'+err.message+'</span>';
+      listStatus.classList.add('warn');
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+/* ====================== PRIZE ROWS ====================== */
+function renderPrizeRows(){
+  const container=document.getElementById('prizeRows');
+  container.innerHTML=State.prizes.map((pr,i)=>{
+    const presets=['一等奖','二等奖','三等奖'];
+    const isPreset=presets.includes(pr.label);
+    return `
+    <div class="prize-row" data-idx="${i}">
+      <select class="prize-sel" data-idx="${i}">
+        <option value="一等奖" ${pr.label==='一等奖'?'selected':''}>一等奖</option>
+        <option value="二等奖" ${pr.label==='二等奖'?'selected':''}>二等奖</option>
+        <option value="三等奖" ${pr.label==='三等奖'?'selected':''}>三等奖</option>
+        <option value="custom" ${!isPreset?'selected':''}>自定义</option>
+      </select>
+      <div class="spinner-wrap">
+        <input type="number" min="1" value="${pr.count}" data-idx="${i}" class="cnt">
+        <div class="spinner-btns">
+          <button class="spinner-btn" onclick="adjustCount(${i},1)">&#9650;</button>
+          <button class="spinner-btn" onclick="adjustCount(${i},-1)">&#9660;</button>
+        </div>
+      </div>
+      <button class="del" onclick="delPrize(${i})" title="删除">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+      </button>
+    </div>
+  `}).join('');
+
+  // handle custom input
+  container.querySelectorAll('.prize-sel').forEach(sel=>{
+    const row=sel.closest('.prize-row');
+    const idx=parseInt(sel.dataset.idx);
+    const isCustom=sel.value==='custom';
+
+    if(isCustom){
+      sel.outerHTML=`<input type="text" class="prize-input" placeholder="奖项名称" value="${State.prizes[idx].label}">`;
+    }
+
+    sel.addEventListener('change',e=>{
+      if(e.target.value==='custom'){
+        e.target.outerHTML=`<input type="text" class="prize-input" placeholder="奖项名称" value="">`;
+      }
+    });
+  });
+}
+
+window.delPrize=function(i){
+  State.prizes.splice(i,1);
+  renderPrizeRows();
+};
+
+window.adjustCount=function(i,delta){
+  State.prizes[i].count=Math.max(1,(State.prizes[i].count||1)+delta);
+  renderPrizeRows();
+};
+
+document.getElementById('btnAddPrize').addEventListener('click',()=>{
+  State.prizes.push({label:'三等奖',count:1});
+  renderPrizeRows();
+});
+
+document.getElementById('btnConfirm').addEventListener('click',()=>{
+  if(State.participants.length===0){
+    toast('请先导入抽奖名单');
+    return;
+  }
+  const rows=document.querySelectorAll('.prize-row');
+  State.prizes=Array.from(rows).map(row=>{
+    const sel=row.querySelector('.prize-sel');
+    const input=row.querySelector('.prize-input');
+    const label=input?input.value.trim():(sel?sel.value:'');
+    const count=parseInt(row.querySelector('input[type="number"]').value)||1;
+    return {label,count};
+  }).filter(p=>p.label && p.label!=='custom');
+  if(State.prizes.length===0){
+    toast('请至少设置一个奖项');
+    return;
+  }
+
+  // save display field settings
+  State.displayFields.name=document.getElementById('showName').checked;
+  State.displayFields.qb=document.getElementById('showQB').checked;
+  State.displayFields.org=document.getElementById('showOrg').checked;
+  State.displayFields.manager=document.getElementById('showManager').checked;
+
+  // 方案A: 修改奖项设置时自动清空中奖记录，避免逻辑紊乱
+  State.winners={};
+
+  State.configured=true;
+  setupMask.classList.remove('show');
+  renderInfobar();
+  renderResults();
+  document.getElementById('dcLabel').textContent='点击抽奖';
+  document.getElementById('dcName').textContent='';
+  document.getElementById('dcPrize').textContent='';
+  toast('✓ 配置完成，点击星盘开始抽奖');
+});
+
+/* ====================== RESULTS ====================== */
+function renderResults(){
+  const body=document.getElementById('resultBody');
+  if(Object.keys(State.winners).length===0){
+    body.innerHTML='<div class="result-empty">还没有抽奖结果，快去转动星盘吧 ✦</div>';
+    return;
+  }
+  const groups=State.prizes.map((pr,i)=>{
+    const winners=State.winners[i]||[];
+    if(winners.length===0)return '';
+    const rows=winners.map(w=>{
+      const parts=[];
+      if(State.displayFields.name) parts.push(`<div class="wn">${w.name}</div>`);
+      if(State.displayFields.qb && w.qb) parts.push(`<div class="wq">${w.qb}</div>`);
+      if(State.displayFields.org && w.org) parts.push(`<div class="wo">${w.org}</div>`);
+      if(State.displayFields.manager && w.manager) parts.push(`<div class="wo">${w.manager}</div>`);
+      return `<div class="winner">${parts.join('')}</div>`;
+    }).join('');
+    return `
+      <div class="result-group">
+        <div class="rg-head">${pr.label} (${winners.length})<span class="bar"></span></div>
+        <div class="winner-list">${rows}</div>
+      </div>
+    `;
+  }).join('');
+  body.innerHTML=groups||'<div class="result-empty">还没有抽奖结果</div>';
+}
+
+document.getElementById('btnExport').addEventListener('click',()=>{
+  if(Object.keys(State.winners).length===0){toast('暂无结果可导出');return;}
+  const headers=[];
+  if(State.displayFields.name) headers.push('姓名');
+  if(State.displayFields.qb) headers.push('QB账号');
+  if(State.displayFields.org) headers.push('机构');
+  if(State.displayFields.manager) headers.push('客户经理');
+  let csv='奖项,'+headers.join(',')+'\n';
+  State.prizes.forEach((pr,i)=>{
+    (State.winners[i]||[]).forEach(w=>{
+      const row=[pr.label];
+      if(State.displayFields.name) row.push(w.name);
+      if(State.displayFields.qb) row.push(w.qb||'');
+      if(State.displayFields.org) row.push(w.org||'');
+      if(State.displayFields.manager) row.push(w.manager||'');
+      csv+=row.join(',')+'\n';
+    });
+  });
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);
+  link.download='抽奖结果.csv';
+  link.click();
+  toast('✓ 已导出 CSV');
+});
+
+document.getElementById('btnReset').addEventListener('click',()=>{
+  if(!confirm('确定要重置所有抽奖结果吗？此操作不可恢复。'))return;
+  State.winners={};
+  State.configured=false;
+  State.prizes=[];
+  State.participants=[];
+  State.displayFields={name:true,qb:true,org:true};
+  renderInfobar();
+  renderResults();
+  document.getElementById('dcLabel').textContent='点击抽奖';
+  document.getElementById('dcName').textContent='';
+  document.getElementById('dcPrize').textContent='';
+  document.getElementById('listStatus').innerHTML='';
+  document.getElementById('fileInput').value='';
+  toast('已重置抽奖');
+});
+
+// init
+renderInfobar();
+</script>
+</body>
+</html>
